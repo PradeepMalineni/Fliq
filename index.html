@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fliq</title>
+<meta name="description" content="Fliq picks the perfect movie for tonight based on who's watching, your mood and your streaming services.">
+<meta name="theme-color" content="#140c0f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Instrument+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23140c0f'/%3E%3Ctext x='32' y='46' font-family='Arial Black,sans-serif' font-size='40' font-weight='900' text-anchor='middle' fill='%23f2b84b'%3EF%3C/text%3E%3C/svg%3E">
+<style>
+/* Layout: a single centered "lobby" column — marquee header, the three-question ticket booth, then tonight's feature as an admit-one ticket with two smaller backup stubs. */
+:root{
+  --bg:#140c0f;          /* theater dark, warm red bias */
+  --surface:#1f1418;     /* seat velvet in shadow */
+  --surface-2:#2a1b21;
+  --line:#3b2730;
+  --velvet:#8c1c32;      /* curtain red */
+  --amber:#f2b84b;       /* marquee bulb */
+  --fg:#f4eade;          /* screen-light ivory */
+  --muted:#ad9a92;
+  --font-display:"Big Shoulders Display","Oswald","Arial Narrow",Impact,sans-serif;
+  --font-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"DM Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r:14px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(140,28,50,.35), transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
+  color:var(--fg);
+  font-family:var(--font-body);
+  font-size:16px;line-height:1.5;
+  min-height:100vh;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+img{max-width:100%}
+[hidden]{display:none!important}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.wrap{max-width:880px;margin:0 auto;padding-inline:20px;padding-block:28px 64px;display:flex;flex-direction:column;gap:36px}
+
+/* Marquee */
+.marquee{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:14px}
+.sign{
+  position:relative;padding:6px 18px 4px;border:2px solid var(--amber);border-radius:10px;
+  font-family:var(--font-display);font-weight:900;font-size:44px;letter-spacing:.06em;line-height:1;
+  color:var(--amber);text-shadow:0 0 18px rgba(242,184,75,.45);
+}
+.sign::before,.sign::after{
+  content:"";position:absolute;left:8px;right:8px;height:4px;
+  background:radial-gradient(circle,var(--amber) 1.6px,transparent 2.2px) 0 0/12px 4px repeat-x;
+  opacity:.9;animation:bulbs 2.4s steps(2) infinite;
+}
+.sign::before{top:-9px}.sign::after{bottom:-9px;animation-delay:-1.2s}
+@keyframes bulbs{50%{opacity:.35}}
+.tag{color:var(--muted);font-size:14px;max-width:24ch;line-height:1.35}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.ghost{
+  background:transparent;border:1px solid var(--line);color:var(--muted);
+  padding:8px 12px;border-radius:999px;font-size:13px;cursor:pointer;
+}
+.ghost:hover{color:var(--fg);border-color:var(--muted)}
+
+/* Key panel */
+.keybox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:10px}
+.keybox h2{margin:0;font-size:16px}
+.keybox p{margin:0;color:var(--muted);font-size:14px}
+.keyrow{display:flex;gap:8px;flex-wrap:wrap}
+.keyrow input{flex:1 1 220px;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:var(--font-mono);font-size:14px}
+.keymsg{font-size:13px;min-height:1.2em}
+.keymsg.ok{color:#8fd19e}.keymsg.err{color:#ff9b8a}
+a{color:var(--amber)}
+
+/* Booth */
+.booth{display:flex;flex-direction:column;gap:26px}
+.q{display:flex;flex-direction:column;gap:12px}
+.qhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.qnum{font-family:var(--font-mono);font-size:12px;color:var(--amber);letter-spacing:.08em}
+.qtitle{font-family:var(--font-display);font-weight:800;font-size:26px;letter-spacing:.02em;text-transform:uppercase;line-height:1.1;margin:0}
+.qhint{color:var(--muted);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid var(--line);border-radius:999px;
+  padding:9px 15px;font-size:15px;cursor:pointer;user-select:none;transition:border-color .15s,background .15s,color .15s;
+}
+.chip:hover{border-color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--velvet);border-color:var(--velvet);color:#fff}
+.chip .ico{font-size:13px;opacity:.75;font-family:var(--font-mono)}
+.who .chip{text-align:left;padding:12px 18px;border-radius:12px;flex-direction:column;align-items:flex-start;gap:2px;min-width:132px}
+.who .chip b{font-weight:600}
+.who .chip span{font-size:12px;color:var(--muted)}
+.who .chip[aria-pressed="true"] span{color:rgba(255,255,255,.75)}
+.cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.roll{
+  background:var(--amber);color:#2a1606;border:0;border-radius:12px;
+  padding:14px 26px;font-family:var(--font-display);font-weight:800;font-size:22px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+  box-shadow:0 0 0 0 rgba(242,184,75,.5);transition:transform .12s, box-shadow .2s;
+}
+.roll:hover{box-shadow:0 0 24px 2px rgba(242,184,75,.35)}
+.roll:active{transform:scale(.98)}
+.status{color:var(--muted);font-size:13px}
+
+/* Feature ticket */
+.feature{display:flex;flex-direction:column;gap:18px}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+.ticket{
+  position:relative;display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);
+  background:var(--surface);border-radius:var(--r);overflow:hidden;
+  border:1px solid var(--line);
+}
+.ticket::before,.ticket::after{ /* punched notches */
+  content:"";position:absolute;left:220px;width:22px;height:22px;border-radius:50%;background:var(--bg);transform:translateX(-50%);z-index:2;
+}
+.ticket::before{top:-11px}.ticket::after{bottom:-11px}
+.poster{position:relative;aspect-ratio:2/3;max-width:100%;background:var(--surface-2);border-right:2px dashed var(--line)}
+.poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.fauxposter{
+  position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding:16px;
+  background:linear-gradient(160deg,hsl(var(--h) 45% 26%),hsl(calc(var(--h) + 40) 50% 10%));
+}
+.fauxposter b{font-family:var(--font-display);font-weight:900;font-size:28px;line-height:.95;text-transform:uppercase;letter-spacing:.02em;text-wrap:balance;overflow-wrap:break-word;hyphens:auto}
+.fauxposter span{font-family:var(--font-mono);font-size:12px;opacity:.75}
+.info{padding:22px 24px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.title{font-family:var(--font-display);font-weight:900;font-size:clamp(32px,6vw,48px);line-height:.95;text-transform:uppercase;letter-spacing:.01em;margin:0;text-wrap:balance;overflow-wrap:anywhere}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--font-mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.scores{display:flex;flex-wrap:wrap;gap:8px}
+.score{display:inline-flex;align-items:baseline;gap:6px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-family:var(--font-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.score b{font-size:16px;color:var(--fg)}
+.score small{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.why{margin:0;font-size:16px;line-height:1.5;max-width:60ch}
+.why strong{color:var(--amber);font-weight:600}
+.plot{margin:0;color:var(--muted);font-size:14px;max-width:62ch}
+.credits{font-size:13px;color:var(--muted)}
+.credits b{color:var(--fg);font-weight:500}
+.showtime{font-family:var(--font-mono);font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:10px;font-variant-numeric:tabular-nums}
+.showtime b{color:var(--fg);font-weight:500}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--fg);
+  padding:9px 14px;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;
+}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--velvet);border-color:var(--velvet);color:#fff}
+.btn.seen[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+.svc{display:inline-block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-family:var(--font-mono);padding:3px 8px;border-radius:6px;background:rgba(242,184,75,.12);color:var(--amber);border:1px solid rgba(242,184,75,.3)}
+
+/* Backups */
+.backups-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.backups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.stub{display:grid;grid-template-columns:96px minmax(0,1fr);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.stub .poster{border-right:2px dashed var(--line)}
+.stub .fauxposter{padding:10px}
+.stub .fauxposter b{font-size:14px;letter-spacing:0}
+.stub .fauxposter span{display:none}
+.stub .info{padding:14px 16px;gap:8px}
+.stub h3{margin:0;font-family:var(--font-display);font-weight:800;font-size:22px;line-height:1;text-transform:uppercase;overflow-wrap:anywhere}
+.stub .why{font-size:13px;color:var(--muted)}
+.stub .actions .btn{padding:6px 10px;font-size:13px}
+
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:24px;color:var(--muted)}
+.empty b{color:var(--fg)}
+
+/* Who's watching gate */
+.gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding-inline:20px;padding-block:48px}
+.gate-inner{width:100%;max-width:640px;display:flex;flex-direction:column;align-items:center;gap:28px;text-align:center}
+.gate .sign{font-size:64px;padding:10px 26px 6px}
+.gate h1{margin:0;font-family:var(--font-display);font-weight:800;font-size:clamp(34px,7vw,52px);text-transform:uppercase;letter-spacing:.02em;line-height:1;text-wrap:balance}
+.gate .sub{margin:-12px 0 0;color:var(--muted);font-size:15px}
+.people{display:flex;flex-wrap:wrap;justify-content:center;gap:18px}
+.person{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;background:none;border:0;padding:0;cursor:pointer;width:112px}
+.face{width:104px;height:104px;border-radius:18px;display:grid;place-items:center;font-family:var(--font-display);font-weight:900;font-size:46px;color:#fff;
+  background:linear-gradient(150deg,hsl(var(--h) 55% 38%),hsl(calc(var(--h) + 35) 60% 16%));border:2px solid transparent;transition:border-color .15s,transform .15s}
+.person:hover .face,.person:focus-visible .face{border-color:var(--amber);transform:translateY(-2px)}
+.person:focus-visible{outline:none}
+.person .nm{font-size:15px;color:var(--fg);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.person.add .face{background:var(--surface);border:2px dashed var(--line);color:var(--muted);font-size:40px}
+.person .x{position:absolute;top:-8px;right:-2px;width:28px;height:28px;border-radius:50%;background:var(--velvet);color:#fff;border:2px solid var(--bg);font-size:15px;line-height:1;display:grid;place-items:center}
+.nameform{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;max-width:420px}
+.nameform input{flex:1 1 200px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:18px;text-align:center}
+.nameform .roll{font-size:20px;padding:12px 22px}
+.gate-links{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.hello{font-family:var(--font-display);font-weight:800;font-size:22px;letter-spacing:.02em;text-transform:uppercase;color:var(--fg);line-height:1.05}
+.hello small{display:block;font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:400;font-size:13px;color:var(--muted);margin-top:2px}
+footer{color:var(--muted);font-size:12px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:18px}
+footer p{margin:0;max-width:70ch}
+
+.fade-in{animation:fade .45s ease both}
+@keyframes fade{from{opacity:.0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.sign::before,.sign::after,.fade-in{animation:none}}
+
+@media (max-width:640px){
+  .wrap{padding-inline:16px;gap:30px}
+  .ticket{grid-template-columns:minmax(0,1fr)}
+  .ticket::before,.ticket::after{display:none}
+  .ticket .poster{width:150px;margin:20px 0 0 20px;border-right:0;border-radius:10px;overflow:hidden}
+  .ticket .fauxposter b{font-size:22px}
+  .backups{grid-template-columns:minmax(0,1fr)}
+  .who .chip{min-width:0;flex:1 1 40%}
+  .qtitle{font-size:22px}
+}
+</style>
+</head>
+<body>
+<section class="gate" id="gate" aria-labelledby="gateTitle">
+  <div class="gate-inner">
+    <div class="sign" aria-hidden="true">FLIQ</div>
+    <h1 id="gateTitle">Who's watching?</h1>
+    <p class="sub" id="gateSub">Tell Fliq your name and it'll pick tonight's movie for you.</p>
+    <div class="people" id="people"></div>
+    <form class="nameform" id="nameForm" hidden>
+      <input id="nameInput" type="text" maxlength="24" autocomplete="given-name" placeholder="Your name" aria-label="Your name">
+      <button class="roll" type="button" id="goBtn">Let's go</button>
+    </form>
+    <div class="gate-links">
+      <button class="ghost" type="button" id="manageBtn" hidden>Manage people</button>
+      <button class="ghost" type="button" id="cancelAdd" hidden>Back</button>
+    </div>
+  </div>
+</section>
+<div class="wrap" id="app" hidden>
+
+  <header class="marquee">
+    <div class="logo">
+      <div class="sign" aria-label="Fliq">FLIQ</div>
+      <div class="hello" id="greet">Good evening<small>Tonight's movie, picked in three taps.</small></div>
+    </div>
+    <div class="toolbar">
+      <button class="ghost" id="switchBtn" type="button">Switch viewer</button>
+      <button class="ghost" id="seenBtn" type="button">Seen list (0)</button>
+      <button class="ghost" id="keyToggle" type="button">OMDb key</button>
+    </div>
+  </header>
+
+  <section class="keybox" id="keybox" hidden aria-labelledby="keyTitle">
+    <h2 id="keyTitle">Connect OMDb for posters and ratings</h2>
+    <p>Paste your free OMDb key. It stays in this browser only. Fliq works without it, just with plain posters and no ratings.</p>
+    <form class="keyrow" id="keyForm">
+      <input id="keyInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="e.g. 1a2b3c4d" aria-label="OMDb API key">
+      <button class="btn primary" type="button" id="keySave">Save key</button>
+      <button class="btn" type="button" id="keyClear">Remove</button>
+    </form>
+    <div class="keymsg" id="keyMsg" role="status"></div>
+  </section>
+
+  <section class="keybox" id="seenbox" hidden aria-labelledby="seenTitle">
+    <h2 id="seenTitle">Movies you've seen</h2>
+    <p id="seenList">Nothing yet. Tap "Seen it" on any pick and Fliq won't suggest it again.</p>
+    <div class="keyrow"><button class="btn" type="button" id="seenClear">Clear seen list</button></div>
+  </section>
+
+  <main class="booth" aria-label="Your movie night">
+    <div class="q">
+      <div class="qhead"><span class="qnum">01</span><h2 class="qtitle" id="whoTitle">Who's watching?</h2></div>
+      <div class="chips who" id="who" role="group" aria-label="Who's watching"></div>
+    </div>
+    <div class="q">
+      <div class="qhead"><span class="qnum">02</span><h2 class="qtitle">What's the mood?</h2><span class="qhint">Pick up to two</span></div>
+      <div class="chips" id="mood" role="group" aria-label="Mood"></div>
+    </div>
+    <div class="q">
+      <div class="qhead"><span class="qnum">03</span><h2 class="qtitle">Which languages?</h2><span class="qhint">Pick as many as you like. Pick none for all languages.</span></div>
+      <div class="chips" id="lang" role="group" aria-label="Languages"></div>
+    </div>
+    <div class="q">
+      <div class="qhead"><span class="qnum">04</span><h2 class="qtitle">Any genre in mind?</h2><span class="qhint">Optional</span></div>
+      <div class="chips" id="genre" role="group" aria-label="Genre"></div>
+    </div>
+    <div class="q">
+      <div class="qhead"><span class="qnum">05</span><h2 class="qtitle">Your streaming services</h2><span class="qhint">Fliq leans toward what you have</span></div>
+      <div class="chips" id="svc" role="group" aria-label="Streaming services"></div>
+    </div>
+    <div class="cta">
+      <button class="roll" id="roll" type="button">Pick my movie</button>
+      <span class="status" id="status" role="status"></span>
+    </div>
+  </main>
+
+  <section class="feature" id="result" aria-live="polite"></section>
+
+  <footer>
+    <p>Movie details, posters and ratings come from OMDb when a key is connected. Streaming availability changes often, so "Where to stream" checks JustWatch India live.</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- Catalog ----------
+   Title | Year | Minutes | genres | moods | who | services
+   services: N Netflix, P Prime Video, H JioHotstar, A Apple TV+ (only where the film is the platform's own or studio-owned) */
+const RAW = `
+Paddington 2|2017|103|comedy,family|feelgood,cozy,laugh|solo,date,family|
+Paddington|2014|95|comedy,family|cozy,feelgood|solo,family|
+The Grand Budapest Hotel|2014|99|comedy,adventure|laugh,cozy|solo,date,friends|H
+Knives Out|2019|130|mystery,comedy,crime|thrilling,laugh|solo,date,friends,family|
+Glass Onion: A Knives Out Mystery|2022|139|mystery,comedy|laugh,thrilling|solo,date,friends,family|N
+Wake Up Dead Man: A Knives Out Mystery|2025|144|mystery,comedy|thrilling,mindbending|solo,date,friends|N
+Crazy Rich Asians|2018|120|romance,comedy|feelgood,laugh|date,friends|
+The Princess Bride|1987|98|adventure,romance,comedy|cozy,feelgood|solo,date,friends,family|H
+Ferris Bueller's Day Off|1986|103|comedy|laugh,feelgood|solo,friends|
+Superbad|2007|113|comedy|laugh|friends|
+The Hangover|2009|100|comedy|laugh|friends|
+21 Jump Street|2012|109|comedy,action|laugh|friends|
+Game Night|2018|100|comedy,crime|laugh,thrilling|date,friends|
+The Intern|2015|121|comedy,drama|feelgood,cozy|solo,date,family|
+Chef|2014|114|comedy,drama|feelgood,cozy|solo,date,family|
+About Time|2013|123|romance,fantasy,drama|emotional,feelgood|date,solo|
+Notting Hill|1999|124|romance,comedy|cozy,feelgood|date|
+When Harry Met Sally...|1989|95|romance,comedy|cozy,laugh|date|
+La La Land|2016|128|musical,romance,drama|emotional,feelgood|date,solo|
+The Holiday|2006|136|romance,comedy|cozy,feelgood|date,solo|
+Pride & Prejudice|2005|129|romance,drama|cozy,emotional|date,solo|
+Love Actually|2003|135|romance,comedy|cozy,feelgood|date|
+Crazy, Stupid, Love.|2011|118|romance,comedy|laugh,feelgood|date,friends|
+10 Things I Hate About You|1999|97|romance,comedy|laugh,cozy|date,friends|H
+The Proposal|2009|108|romance,comedy|laugh,feelgood|date|H
+Mean Girls|2004|97|comedy|laugh|friends|
+Booksmart|2019|102|comedy|laugh,feelgood|friends|
+Hunt for the Wilderpeople|2016|101|comedy,adventure|feelgood,laugh|solo,family,friends|
+The Secret Life of Walter Mitty|2013|114|adventure,comedy,drama|feelgood|solo,date,family|H
+Little Miss Sunshine|2006|101|comedy,drama|feelgood,laugh|solo,friends,date|H
+Jojo Rabbit|2019|108|comedy,drama,war|emotional,laugh|solo,date|H
+School of Rock|2003|109|comedy,musical|laugh,feelgood|family,friends|
+Mrs. Doubtfire|1993|125|comedy,family|laugh|family|H
+Home Alone|1990|103|comedy,family|laugh,cozy|family|H
+Barbie|2023|114|comedy,fantasy|laugh,feelgood|friends,date|
+Free Guy|2021|115|comedy,action,scifi|laugh,feelgood|friends,family|H
+The Nice Guys|2016|116|comedy,crime,action|laugh|friends,solo|
+Hot Fuzz|2007|121|comedy,action|laugh|friends|
+Shaun of the Dead|2004|99|comedy,horror|laugh|friends|
+What We Do in the Shadows|2014|86|comedy,horror|laugh|friends|
+Bridesmaids|2011|125|comedy|laugh|friends|
+Murder Mystery|2019|97|comedy,mystery|laugh|date,friends|N
+Red Notice|2021|118|action,comedy|thrilling,laugh|friends|N
+Anyone But You|2023|103|romance,comedy|laugh|date|
+Set It Up|2018|105|romance,comedy|cozy,laugh|date|N
+To All the Boys I've Loved Before|2018|99|romance,comedy|cozy,feelgood|date,solo|N
+Enola Holmes|2020|123|mystery,adventure|feelgood,cozy|family,solo|N
+Klaus|2019|96|animation,family,comedy|cozy,emotional,feelgood|family|N
+The Mitchells vs. the Machines|2021|113|animation,comedy,scifi|laugh,feelgood|family,friends|N
+Toy Story|1995|81|animation,family,comedy|cozy,feelgood|family|H
+Up|2009|96|animation,adventure|emotional,feelgood|family,date|H
+Inside Out|2015|95|animation,family|emotional,feelgood|family|H
+Inside Out 2|2024|96|animation,family|feelgood,emotional|family|H
+Coco|2017|105|animation,musical,family|emotional,feelgood|family|H
+WALL·E|2008|98|animation,scifi|emotional,cozy|family,date|H
+Ratatouille|2007|111|animation,comedy|cozy,feelgood|family|H
+Finding Nemo|2003|100|animation,adventure|feelgood,cozy|family|H
+The Incredibles|2004|115|animation,action|feelgood,thrilling|family|H
+Zootopia|2016|108|animation,comedy,mystery|laugh,feelgood|family|H
+Moana|2016|107|animation,adventure,musical|feelgood,epic|family|H
+Frozen|2013|102|animation,musical|feelgood|family|H
+Encanto|2021|102|animation,musical|feelgood|family|H
+The Lion King|1994|88|animation,musical|emotional,epic|family|H
+Aladdin|1992|90|animation,musical|feelgood|family|H
+Beauty and the Beast|1991|84|animation,musical,romance|cozy|family|H
+Spider-Man: Into the Spider-Verse|2018|117|animation,action|thrilling,feelgood,epic|family,friends,solo|
+Spider-Man: Across the Spider-Verse|2023|140|animation,action|epic,thrilling|family,friends,solo|
+Shrek|2001|90|animation,comedy|laugh,cozy|family,friends|
+How to Train Your Dragon|2010|98|animation,adventure,fantasy|epic,feelgood|family|
+Kung Fu Panda|2008|92|animation,action,comedy|laugh,feelgood|family|
+The Lego Movie|2014|100|animation,comedy|laugh|family,friends|
+Puss in Boots: The Last Wish|2022|102|animation,adventure,comedy|laugh,feelgood|family|
+The Wild Robot|2024|102|animation,scifi,family|emotional,cozy|family|
+Wonka|2023|116|musical,fantasy,family|cozy,feelgood|family|
+Elf|2003|97|comedy,family|cozy,laugh|family|
+Night at the Museum|2006|108|comedy,family|laugh|family|H
+Jumanji: Welcome to the Jungle|2017|119|adventure,comedy|laugh,feelgood|family,friends|
+Inception|2010|148|scifi,action,thriller|mindbending,epic,thrilling|solo,friends,date|
+Interstellar|2014|169|scifi,drama,adventure|mindbending,epic,emotional|solo,date,friends|
+The Prestige|2006|130|mystery,thriller,drama|mindbending|solo,date|
+Memento|2000|113|mystery,thriller|mindbending,dark|solo|
+Shutter Island|2010|138|mystery,thriller|mindbending,dark|solo,date|
+Gone Girl|2014|149|thriller,mystery,drama|dark,thrilling,mindbending|solo,date|H
+Se7en|1995|127|crime,thriller|dark,thrilling|solo|
+Prisoners|2013|153|crime,thriller,drama|dark,thrilling|solo|
+Zodiac|2007|157|crime,mystery|dark|solo|
+The Silence of the Lambs|1991|118|crime,thriller,horror|dark,thrilling|solo|
+Arrival|2016|116|scifi,drama|mindbending,emotional|solo,date|
+Ex Machina|2014|108|scifi,thriller|mindbending,dark|solo,date|
+Edge of Tomorrow|2014|113|scifi,action|thrilling,mindbending|friends,solo|
+Looper|2012|119|scifi,action|mindbending,thrilling|solo,friends|
+Source Code|2011|93|scifi,thriller|mindbending,thrilling|solo,date|
+Tenet|2020|150|scifi,action|mindbending,thrilling|solo,friends|
+The Matrix|1999|136|scifi,action|mindbending,epic,thrilling|solo,friends|
+Everything Everywhere All at Once|2022|139|scifi,comedy,action|mindbending,emotional,laugh|solo,date,friends|
+Get Out|2017|104|horror,thriller,mystery|dark,thrilling,mindbending|friends,solo,date|
+Nightcrawler|2014|117|crime,thriller|dark|solo|
+Sicario|2015|121|crime,thriller,action|dark,thrilling|solo|
+No Country for Old Men|2007|122|crime,thriller|dark,thrilling|solo|
+The Departed|2006|151|crime,thriller|dark,thrilling|solo,friends|
+Heat|1995|170|crime,action|thrilling,epic|solo,friends|
+The Usual Suspects|1995|106|crime,mystery|mindbending|solo|
+Fight Club|1999|139|drama,thriller|dark,mindbending|solo,friends|H
+Now You See Me|2013|115|thriller,crime|mindbending,thrilling|friends,date|
+Oppenheimer|2023|180|biography,drama|epic,emotional|solo|
+Dune|2021|155|scifi,adventure|epic|solo,friends|
+Dune: Part Two|2024|166|scifi,adventure,action|epic,thrilling|solo,friends|
+Blade Runner 2049|2017|164|scifi,mystery|mindbending,dark|solo|
+Mad Max: Fury Road|2015|120|action,scifi|thrilling,epic|friends,solo|
+John Wick|2014|101|action,thriller|thrilling|friends,solo|
+Mission: Impossible - Fallout|2018|147|action,thriller|thrilling,epic|friends,solo,date|
+Top Gun: Maverick|2022|130|action,drama|thrilling,feelgood,epic|friends,family,date,solo|
+The Dark Knight|2008|152|action,crime,drama|epic,dark,thrilling|solo,friends|
+Avengers: Endgame|2019|181|action,scifi|epic,emotional|friends,family|H
+Avengers: Infinity War|2018|149|action,scifi|epic,thrilling|friends|H
+Guardians of the Galaxy|2014|121|action,comedy,scifi|laugh,feelgood,thrilling|friends,family|H
+Thor: Ragnarok|2017|130|action,comedy|laugh,thrilling|friends,family|H
+Black Panther|2018|134|action,adventure|epic|friends,family|H
+Iron Man|2008|126|action,scifi|feelgood,thrilling|friends,family|H
+Logan|2017|137|action,drama|emotional,dark|solo|H
+Deadpool|2016|108|action,comedy|laugh|friends|H
+Deadpool & Wolverine|2024|128|action,comedy|laugh|friends|H
+Spider-Man: No Way Home|2021|148|action,adventure|epic,feelgood|friends,family|
+Rogue One: A Star Wars Story|2016|133|scifi,action|epic|friends|H
+Star Wars: Episode IV - A New Hope|1977|121|scifi,adventure|epic|family,friends|H
+Jurassic Park|1993|127|adventure,scifi|thrilling,epic|family,friends|
+Back to the Future|1985|116|scifi,comedy,adventure|feelgood,laugh|family,friends|
+Gladiator|2000|155|action,drama|epic,emotional|solo,friends|
+The Lord of the Rings: The Fellowship of the Ring|2001|178|fantasy,adventure|epic|solo,friends,family|
+Pirates of the Caribbean: The Curse of the Black Pearl|2003|143|adventure,fantasy|feelgood,epic|family,friends|H
+Harry Potter and the Sorcerer's Stone|2001|152|fantasy,family|cozy,feelgood|family|
+The Martian|2015|144|scifi,adventure|feelgood,thrilling|solo,family,friends|H
+Gravity|2013|91|scifi,thriller|thrilling|solo,date|
+Baby Driver|2017|113|action,crime|thrilling|friends,date|
+Kingsman: The Secret Service|2014|129|action,comedy|thrilling,laugh|friends|H
+Sherlock Holmes|2009|128|action,mystery|thrilling,laugh|friends|
+The Man from U.N.C.L.E.|2015|116|action,comedy|laugh|date,friends|
+The Bourne Identity|2002|119|action,thriller|thrilling|solo,friends|
+Casino Royale|2006|144|action,thriller|thrilling|solo,friends,date|
+Skyfall|2012|143|action,thriller|thrilling|friends|
+Ford v Ferrari|2019|152|biography,sports,drama|thrilling,feelgood|solo,friends,family|H
+Rocky|1976|120|sports,drama|feelgood,emotional|solo|
+Creed|2015|133|sports,drama|emotional,feelgood|solo|
+Whiplash|2014|106|drama,musical|thrilling,dark|solo|
+The Social Network|2010|120|drama,biography|thrilling|solo|
+Moneyball|2011|133|sports,drama|feelgood|solo|
+The Wolf of Wall Street|2013|180|biography,comedy,crime|laugh,dark|friends,solo|
+Catch Me If You Can|2002|141|crime,biography,comedy|feelgood,thrilling|solo,date,family|
+Ocean's Eleven|2001|116|crime,comedy|feelgood,laugh,thrilling|friends,date|
+Pulp Fiction|1994|154|crime|dark,laugh|friends,solo|
+Django Unchained|2012|165|drama,action|thrilling,dark|friends,solo|
+Inglourious Basterds|2009|153|war,drama|thrilling,dark|friends,solo|
+Extraction|2020|116|action,thriller|thrilling|friends,solo|N
+The Gray Man|2022|122|action,thriller|thrilling|friends|N
+The Irishman|2019|209|crime,drama|dark,epic|solo|N
+Don't Look Up|2021|138|comedy,scifi|laugh,dark|friends,solo|N
+Marriage Story|2019|137|drama,romance|emotional|solo|N
+The Adam Project|2022|106|scifi,adventure,comedy|feelgood|family|N
+Leave the World Behind|2023|141|thriller,mystery|dark,mindbending|solo,date|N
+Saltburn|2023|131|thriller,drama|dark|solo|P
+The Tomorrow War|2021|138|scifi,action|thrilling|friends|P
+Sound of Metal|2019|120|drama,musical|emotional|solo|P
+Air|2023|111|drama,sports|feelgood|solo,friends|P
+Manchester by the Sea|2016|137|drama|emotional|solo|P
+Challengers|2024|131|romance,sports,drama|thrilling|date,solo|P
+CODA|2021|111|drama,musical|emotional,feelgood|family,solo,date|A
+Greyhound|2020|91|war,action|thrilling|solo|A
+Wolfs|2024|108|comedy,crime|laugh|friends|A
+The Gorge|2025|127|action,scifi,romance|thrilling|date,friends|A
+Killers of the Flower Moon|2023|206|crime,drama|dark,epic|solo|A
+The Shawshank Redemption|1994|142|drama|emotional,feelgood|solo|
+Forrest Gump|1994|142|drama,romance|emotional,feelgood|solo,date,family|
+Good Will Hunting|1997|126|drama|emotional|solo|
+Dead Poets Society|1989|128|drama|emotional|solo,family|H
+The Pursuit of Happyness|2006|117|biography,drama|emotional|solo,family|
+Green Book|2018|130|biography,comedy,drama|feelgood,emotional|solo,family,date|
+Hidden Figures|2016|127|biography,drama|feelgood|family,solo|H
+The Help|2011|146|drama|emotional|solo,family|H
+A Beautiful Mind|2001|135|biography,drama|emotional,mindbending|solo|
+The Fault in Our Stars|2014|126|romance,drama|emotional|date,solo|H
+Eternal Sunshine of the Spotless Mind|2004|108|romance,scifi,drama|mindbending,emotional|date,solo|
+Her|2013|126|romance,scifi,drama|emotional,mindbending|solo|
+Before Sunrise|1995|101|romance,drama|cozy,emotional|date|
+The Notebook|2004|123|romance,drama|emotional|date|
+Titanic|1997|194|romance,drama|emotional,epic|date|H
+Past Lives|2023|105|romance,drama|emotional|date,solo|
+Little Women|2019|135|drama,romance|cozy,emotional|solo,family,date|
+Lady Bird|2017|94|comedy,drama|emotional,laugh|solo|
+Wonder|2017|113|drama,family|emotional,feelgood|family|
+Life of Pi|2012|127|adventure,drama|emotional,epic,mindbending|solo,family|H
+12 Angry Men|1957|96|drama,crime|thrilling|solo|
+Schindler's List|1993|195|biography,drama,war|emotional|solo|
+1917|2019|119|war,drama|thrilling,epic|solo|
+Saving Private Ryan|1998|169|war,drama|epic,emotional|solo|
+Dunkirk|2017|106|war,thriller|thrilling|solo|
+Bohemian Rhapsody|2018|134|biography,musical|feelgood|friends,family,solo|H
+The Greatest Showman|2017|105|musical,drama|feelgood|family,date|H
+Mamma Mia!|2008|108|musical,comedy|feelgood|friends,date|
+Sing Street|2016|106|musical,romance|feelgood|solo,date|
+Begin Again|2013|104|musical,romance|feelgood,cozy|date,solo|
+Wicked|2024|160|musical,fantasy|feelgood,epic|friends,family,date|
+The Truman Show|1998|103|comedy,drama,scifi|mindbending,emotional|solo,family,date|
+Groundhog Day|1993|101|comedy,fantasy,romance|laugh,cozy,mindbending|date,solo|
+Big Fish|2003|125|fantasy,drama|emotional,cozy|family,date|
+Midnight in Paris|2011|94|comedy,fantasy,romance|cozy|date|
+The Devil Wears Prada|2006|109|comedy,drama|laugh,feelgood|friends,date|H
+Legally Blonde|2001|96|comedy|laugh,feelgood|friends|
+Julie & Julia|2009|123|biography,comedy|cozy|solo,date|
+Murder on the Orient Express|2017|114|mystery,crime|cozy|family,date|H
+Clue|1985|94|comedy,mystery|laugh,cozy|friends,family|
+The Holdovers|2023|133|comedy,drama|cozy,emotional|solo|
+Poor Things|2023|141|comedy,fantasy|mindbending|solo|H
+Conclave|2024|120|drama,thriller|thrilling|solo,date|
+Anora|2024|139|comedy,drama|laugh,emotional|solo|
+The Fall Guy|2024|126|action,comedy|laugh,feelgood|date,friends|
+Twisters|2024|122|action,thriller|thrilling|friends,family|
+A Quiet Place|2018|90|horror,scifi|thrilling,dark|friends,date,solo|
+Hereditary|2018|127|horror|dark|solo,friends|
+The Conjuring|2013|112|horror|dark,thrilling|friends,date|
+It|2017|135|horror|dark,thrilling|friends|
+Talk to Me|2022|95|horror|dark|friends|
+Barbarian|2022|102|horror|dark,thrilling|friends|
+The Others|2001|101|horror,mystery|mindbending,dark|solo,date|
+Scream|1996|111|horror,mystery|thrilling|friends|
+Smile|2022|115|horror|dark|friends|
+Weapons|2025|128|horror,mystery|dark,thrilling|friends|
+Sinners|2025|137|horror,action|dark,epic|friends,solo|
+`;
+
+
+const RAW_INTL = `
+3 Idiots|2009|170|comedy,drama|feelgood,laugh,emotional|solo,friends,family||hi
+Dangal|2016|161|biography,sports,drama|emotional,feelgood|family,solo||hi
+Zindagi Na Milegi Dobara|2011|155|comedy,drama,adventure|feelgood,cozy|friends,date||hi
+Andhadhun|2018|139|thriller,crime,comedy|thrilling,mindbending,dark|solo,date,friends||hi
+Queen|2013|146|comedy,drama|feelgood|solo,friends||hi
+Taare Zameen Par|2007|165|drama,family|emotional|family||hi
+Drishyam|2015|163|thriller,crime|thrilling|family,solo||hi
+Kahaani|2012|122|thriller,mystery|thrilling,mindbending|solo,date||hi
+Gangs of Wasseypur|2012|321|crime|dark|solo||hi
+Dil Chahta Hai|2001|183|comedy,romance,drama|feelgood,cozy|friends,date||hi
+Lagaan: Once Upon a Time in India|2001|224|sports,drama,musical|epic,feelgood|family,friends||hi
+Jab We Met|2007|138|romance,comedy|feelgood,cozy|date||hi
+Yeh Jawaani Hai Deewani|2013|160|romance,comedy|feelgood|date,friends||hi
+Barfi!|2012|151|romance,comedy,drama|emotional,cozy|date,family||hi
+PK|2014|153|comedy,drama,scifi|laugh,feelgood|family,friends||hi
+Munna Bhai M.B.B.S.|2003|156|comedy,drama|laugh,feelgood|family,friends||hi
+Hera Pheri|2000|156|comedy|laugh|friends,family||hi
+Chak De! India|2007|153|sports,drama|feelgood,emotional|family,solo||hi
+Swades|2004|210|drama|emotional|solo,family||hi
+Rang De Basanti|2006|167|drama|emotional|friends,solo||hi
+Dilwale Dulhania Le Jayenge|1995|189|romance,drama|cozy,feelgood|date,family||hi
+Article 15|2019|130|crime,drama|dark|solo||hi
+Stree|2018|128|comedy,horror|laugh,thrilling|friends||hi
+Stree 2: Sarkate Ka Aatank|2024|147|comedy,horror|laugh|friends||hi
+Tumbbad|2018|104|horror,fantasy|dark,mindbending|solo,friends||hi
+Badhaai Ho|2018|124|comedy,drama|laugh,feelgood|family||hi
+Piku|2015|123|comedy,drama|cozy,emotional|solo,family||hi
+Wake Up Sid|2009|138|comedy,romance|cozy|solo,date||hi
+Udaan|2010|134|drama|emotional|solo||hi
+12th Fail|2023|147|biography,drama|emotional,feelgood|solo,family||hi
+Laapataa Ladies|2023|122|comedy,drama|feelgood,laugh|family,solo|N|hi
+Jawan|2023|169|action,thriller|thrilling,epic|friends|N|hi
+Pathaan|2023|146|action,thriller|thrilling|friends|P|hi
+Uri: The Surgical Strike|2019|138|action,war|thrilling|friends,solo||hi
+RRR|2022|187|action,drama|epic,thrilling|friends,family,solo||te
+Baahubali: The Beginning|2015|159|action,fantasy|epic|family,friends||te
+Baahubali 2: The Conclusion|2017|167|action,fantasy|epic|family,friends||te
+Magadheera|2009|166|action,fantasy,romance|epic|family,friends||te
+Eega|2012|134|fantasy,action,comedy|laugh,thrilling|family,friends||te
+Pushpa: The Rise - Part 1|2021|179|action,crime|thrilling|friends||te
+Jersey|2019|160|sports,drama|emotional|solo,family||te
+Arjun Reddy|2017|182|romance,drama|dark,emotional|solo||te
+Ee Nagaraniki Emaindi|2018|134|comedy,drama|laugh,feelgood|friends||te
+Mahanati|2018|177|biography,drama|emotional|solo,family||te
+Agent Sai Srinivasa Athreya|2019|148|mystery,comedy,thriller|mindbending,laugh|solo,friends||te
+C/o Kancharapalem|2018|143|drama,romance|emotional,cozy|solo,date||te
+Sita Ramam|2022|163|romance,drama|emotional|date||te
+Jathi Ratnalu|2021|148|comedy|laugh|friends||te
+Ala Vaikunthapurramuloo|2020|165|action,comedy|feelgood,laugh|family||te
+HanuMan|2024|158|action,fantasy|epic,feelgood|family,friends||te
+Kalki 2898-AD|2024|181|scifi,action|epic|friends||te
+Vikram|2022|175|action,thriller|thrilling|friends||ta
+Kaithi|2019|145|action,thriller|thrilling|friends||ta
+Vikram Vedha|2017|147|crime,thriller|thrilling,mindbending|solo,friends||ta
+Jai Bhim|2021|164|crime,drama|emotional,dark|solo|P|ta
+Soorarai Pottru|2020|153|biography,drama|emotional,feelgood|solo,family|P|ta
+96|2018|158|romance,drama|emotional,cozy|date,solo||ta
+Super Deluxe|2019|176|crime,comedy,drama|mindbending,dark|solo||ta
+Vada Chennai|2018|164|crime|dark|solo||ta
+Ratsasan|2018|170|thriller,crime|thrilling,dark|solo||ta
+Asuran|2019|141|action,drama|dark,emotional|solo||ta
+Kaaka Muttai|2014|109|comedy,drama|feelgood|family||ta
+Anbe Sivam|2003|160|comedy,drama|emotional,feelgood|solo||ta
+Enthiran|2010|174|scifi,action|epic|family,friends||ta
+Jailer|2023|168|action,comedy|thrilling|friends||ta
+Maharaja|2024|141|thriller,crime|thrilling,mindbending,dark|solo|N|ta
+Drishyam|2013|160|thriller,crime|thrilling|family,solo||ml
+Kumbalangi Nights|2019|135|drama,comedy|cozy,emotional|solo,family||ml
+Premam|2015|156|romance,comedy|cozy,feelgood|date,friends||ml
+Bangalore Days|2014|172|comedy,drama,romance|feelgood|friends||ml
+Maheshinte Prathikaaram|2016|120|comedy,drama|cozy,laugh|solo,friends||ml
+The Great Indian Kitchen|2021|100|drama|dark|solo||ml
+Minnal Murali|2021|158|action,comedy,fantasy|feelgood,laugh|family,friends|N|ml
+Joji|2021|113|crime,drama|dark|solo|P|ml
+Romancham|2023|134|comedy,horror|laugh|friends||ml
+Manjummel Boys|2024|135|thriller,adventure|thrilling,emotional|friends||ml
+Premalu|2024|156|romance,comedy|feelgood,laugh|date,friends||ml
+Aavesham|2024|158|action,comedy|laugh,thrilling|friends|P|ml
+Bramayugam|2024|139|horror,fantasy|dark,mindbending|solo||ml
+K.G.F: Chapter 1|2018|156|action,crime|epic,thrilling|friends|P|kn
+K.G.F: Chapter 2|2022|168|action,crime|epic,thrilling|friends|P|kn
+Kantara|2022|148|action,thriller,fantasy|epic,dark|friends,solo|P|kn
+777 Charlie|2022|164|comedy,drama,adventure|emotional,feelgood|family||kn
+Lucia|2013|135|mystery,thriller|mindbending|solo||kn
+Ulidavaru Kandanthe|2014|155|crime,mystery|mindbending|solo||kn
+Parasite|2019|132|thriller,drama|dark,thrilling|solo,date,friends||ko
+Train to Busan|2016|118|horror,action|thrilling|friends||ko
+Oldboy|2003|120|thriller,mystery|dark,mindbending|solo||ko
+Memories of Murder|2003|131|crime,mystery|dark|solo||ko
+The Handmaiden|2016|145|thriller,romance|dark,mindbending|solo||ko
+Spirited Away|2001|125|animation,fantasy|mindbending,cozy|family,solo||ja
+My Neighbor Totoro|1988|86|animation,family|cozy,feelgood|family||ja
+Your Name.|2016|106|animation,romance,fantasy|emotional,mindbending|date,solo||ja
+Howl's Moving Castle|2004|119|animation,fantasy|cozy|family,date||ja
+The Boy and the Heron|2023|124|animation,fantasy|mindbending|family,solo||ja
+Shoplifters|2018|121|drama|emotional|solo||ja
+Seven Samurai|1954|207|action,drama|epic|solo||ja
+Godzilla Minus One|2023|124|scifi,action|epic,thrilling|friends||ja
+Pan's Labyrinth|2006|118|fantasy,war|dark,mindbending|solo||es
+The Invisible Guest|2016|106|thriller,mystery|mindbending,thrilling|solo,date||es
+The Secret in Their Eyes|2009|129|thriller,mystery|mindbending|solo||es
+Roma|2018|135|drama|emotional|solo|N|es
+Society of the Snow|2023|144|drama,adventure|thrilling,emotional|solo|N|es
+Amélie|2001|122|comedy,romance|cozy,feelgood|date,solo||fr
+The Intouchables|2011|112|comedy,drama|feelgood,emotional|solo,family,friends||fr
+Portrait of a Lady on Fire|2019|122|romance,drama|emotional|date,solo||fr
+Anatomy of a Fall|2023|151|thriller,drama|mindbending|solo||fr
+`;
+
+const MOVIES = (RAW.trim() + "\n" + RAW_INTL.trim()).split("\n").map(function(line, i){
+  const p = line.split("|");
+  return {
+    id: i, title: p[0], year: +p[1], mins: +p[2],
+    genres: p[3].split(","), moods: p[4].split(","), who: p[5].split(","),
+    svc: p[6] ? p[6].split(",") : [],
+    lang: p[7] || "en"
+  };
+});
+
+/* ---------- Options ---------- */
+const WHO = [
+  {id:"solo", label:"Just me", sub:"Your call, no compromises"},
+  {id:"date", label:"Date night", sub:"Something for two"},
+  {id:"friends", label:"Friends", sub:"Crowd-pleasers"},
+  {id:"family", label:"Family", sub:"Kid-safe picks only"}
+];
+const MOODS = [
+  {id:"feelgood", label:"Feel-good"},
+  {id:"laugh", label:"Laugh out loud"},
+  {id:"cozy", label:"Cozy"},
+  {id:"thrilling", label:"Edge of my seat"},
+  {id:"mindbending", label:"Mind-bending"},
+  {id:"emotional", label:"A good cry"},
+  {id:"epic", label:"Big & epic"},
+  {id:"dark", label:"Dark & gritty"}
+];
+const GENRES = [
+  ["comedy","Comedy"],["romance","Romance"],["action","Action"],["scifi","Sci-fi"],["thriller","Thriller"],
+  ["mystery","Mystery"],["crime","Crime"],["drama","Drama"],["horror","Horror"],["animation","Animation"],
+  ["fantasy","Fantasy"],["adventure","Adventure"],["musical","Music"],["biography","True story"],["war","War"],["sports","Sports"]
+].map(function(g){return {id:g[0],label:g[1]};});
+const LANGS = [
+  {id:"en",label:"English",adj:""},{id:"hi",label:"Hindi",adj:"Hindi"},{id:"te",label:"Telugu",adj:"Telugu"},
+  {id:"ta",label:"Tamil",adj:"Tamil"},{id:"ml",label:"Malayalam",adj:"Malayalam"},{id:"kn",label:"Kannada",adj:"Kannada"},
+  {id:"ko",label:"Korean",adj:"Korean"},{id:"ja",label:"Japanese",adj:"Japanese"},{id:"es",label:"Spanish",adj:"Spanish"},{id:"fr",label:"French",adj:"French"}
+];
+const LANG = {}; LANGS.forEach(function(l){ LANG[l.id] = l; });
+const SERVICES = [
+  {id:"N", label:"Netflix"},
+  {id:"P", label:"Prime Video"},
+  {id:"H", label:"JioHotstar"},
+  {id:"A", label:"Apple TV+"}
+];
+const SVC_NAME = {N:"Netflix",P:"Prime Video",H:"JioHotstar",A:"Apple TV+"};
+const MOOD_WORD = {feelgood:"feel-good",laugh:"laugh-out-loud",cozy:"cozy",thrilling:"edge-of-your-seat",mindbending:"mind-bending",emotional:"tear-jerking",epic:"big, epic",dark:"dark, gritty"};
+const WHO_WORD = {solo:"a night to yourself",date:"date night",friends:"a group of friends",family:"the whole family"};
+const GENRE_WORD = {comedy:"comedy",romance:"romance",action:"action movie",scifi:"sci-fi",thriller:"thriller",mystery:"mystery",crime:"crime story",drama:"drama",horror:"horror",animation:"animated film",fantasy:"fantasy",adventure:"adventure",musical:"music-driven film",biography:"true story",war:"war film",sports:"sports film",family:"family film"};
+
+/* ---------- Storage (safe) ---------- */
+function load(k, d){ try{ const v = localStorage.getItem("fliq."+k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+function save(k, v){ try{ localStorage.setItem("fliq."+k, JSON.stringify(v)); }catch(e){} }
+
+const state = {
+  name: "",
+  who: "solo", moods: ["feelgood"], genres: [], svcs: [], langs: ["en"],
+  seen: [],                        // titles|year keys, per viewer
+  key: load("key",""),
+  shown: []                        // ids shown this session
+};
+const omdbCache = load("omdb",{});
+function pk(k){ return "p." + state.name.toLowerCase() + "." + k; }
+function saveP(k, v){ save(pk(k), v); }
+function loadProfile(){
+  state.who = load(pk("who"),"solo");
+  state.moods = load(pk("moods"),["feelgood"]);
+  state.genres = load(pk("genres"),[]);
+  state.svcs = load(pk("svcs"),[]);
+  state.langs = load(pk("langs"),["en"]);
+  state.seen = load(pk("seen"),[]);
+  state.shown = [];
+}
+
+/* ---------- Helpers ---------- */
+function el(tag, attrs, kids){
+  const n = document.createElement(tag);
+  if(attrs) for(const k in attrs){
+    const v = attrs[k];
+    if(v == null || v === false) continue;
+    if(k === "class") n.className = v;
+    else if(k === "text") n.textContent = v;
+    else if(k.slice(0,2) === "on") n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  (kids||[]).forEach(function(c){ if(c!=null) n.append(c.nodeType ? c : document.createTextNode(c)); });
+  return n;
+}
+function mkey(m){ return m.title + "|" + m.year; }
+function fmtMins(m){ const h = Math.floor(m/60), r = m%60; return (h? h+"h ":"") + (r? r+"m":""); }
+function hue(s){ let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))%360; return h; }
+function endsAt(mins){
+  const d = new Date(Date.now() + (mins+5)*60000);
+  return d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+}
+function enc(s){ return encodeURIComponent(s); }
+
+/* ---------- Chips ---------- */
+function renderChips(){
+  const who = document.getElementById("who"); who.textContent = "";
+  WHO.forEach(function(o){
+    who.append(el("button",{type:"button",class:"chip","aria-pressed":String(state.who===o.id),onclick:function(){
+      state.who = o.id; saveP("who",state.who); renderChips();
+    }},[el("b",{text:o.label}),el("span",{text:o.sub})]));
+  });
+  const mood = document.getElementById("mood"); mood.textContent = "";
+  MOODS.forEach(function(o){
+    const on = state.moods.indexOf(o.id) > -1;
+    mood.append(el("button",{type:"button",class:"chip","aria-pressed":String(on),onclick:function(){
+      if(on) state.moods = state.moods.filter(function(x){return x!==o.id;});
+      else { state.moods.push(o.id); if(state.moods.length>2) state.moods.shift(); }
+      saveP("moods",state.moods); renderChips();
+    }},[o.label]));
+  });
+  const genre = document.getElementById("genre"); genre.textContent = "";
+  GENRES.forEach(function(o){
+    const on = state.genres.indexOf(o.id) > -1;
+    genre.append(el("button",{type:"button",class:"chip","aria-pressed":String(on),onclick:function(){
+      state.genres = on ? state.genres.filter(function(x){return x!==o.id;}) : state.genres.concat(o.id);
+      saveP("genres",state.genres); renderChips();
+    }},[o.label]));
+  });
+  const lang = document.getElementById("lang"); lang.textContent = "";
+  LANGS.forEach(function(o){
+    const on = state.langs.indexOf(o.id) > -1;
+    lang.append(el("button",{type:"button",class:"chip","aria-pressed":String(on),onclick:function(){
+      state.langs = on ? state.langs.filter(function(x){return x!==o.id;}) : state.langs.concat(o.id);
+      saveP("langs",state.langs); renderChips();
+    }},[o.label]));
+  });
+  const svc = document.getElementById("svc"); svc.textContent = "";
+  SERVICES.forEach(function(o){
+    const on = state.svcs.indexOf(o.id) > -1;
+    svc.append(el("button",{type:"button",class:"chip","aria-pressed":String(on),onclick:function(){
+      state.svcs = on ? state.svcs.filter(function(x){return x!==o.id;}) : state.svcs.concat(o.id);
+      saveP("svcs",state.svcs); renderChips();
+    }},[o.label]));
+  });
+}
+
+/* ---------- Picking ---------- */
+function scoreMovie(m){
+  if(state.seen.indexOf(mkey(m)) > -1) return null;
+  if(state.who === "family" && m.who.indexOf("family") < 0) return null;
+  let s = 0;
+  const moodHits = state.moods.filter(function(x){return m.moods.indexOf(x)>-1;});
+  if(state.moods.length && !moodHits.length) return null;
+  s += moodHits.length * 3;
+  if(state.langs.length && state.langs.indexOf(m.lang) < 0) return null;
+  if(state.genres.length){
+    const gh = state.genres.filter(function(x){return m.genres.indexOf(x)>-1;});
+    if(!gh.length) return null;
+    s += gh.length * 2;
+  }
+  if(m.who.indexOf(state.who) > -1) s += 2.5;
+  else if(state.who === "date" || state.who === "friends") s -= 1;
+  const svcHit = state.svcs.filter(function(x){return m.svc.indexOf(x)>-1;});
+  if(svcHit.length) s += 2.5;
+  s += Math.random() * 2.2;
+  return s;
+}
+function pick(){
+  let pool = MOVIES.map(function(m){ return {m:m, s:scoreMovie(m)}; }).filter(function(x){return x.s!=null;});
+  let fresh = pool.filter(function(x){ return state.shown.indexOf(x.m.id) < 0; });
+  let recycled = false;
+  if(fresh.length < 3 && pool.length >= 3){ state.shown = []; fresh = pool; recycled = true; }
+  fresh.sort(function(a,b){ return b.s - a.s; });
+  const top = fresh.slice(0,3).map(function(x){return x.m;});
+  top.forEach(function(m){ state.shown.push(m.id); });
+  return {list: top, poolSize: pool.length, recycled: recycled};
+}
+
+function whyText(m){
+  const moodHits = state.moods.filter(function(x){return m.moods.indexOf(x)>-1;});
+  const moodPart = moodHits.length ? moodHits.map(function(x){return MOOD_WORD[x];}).join(" and ") : MOOD_WORD[m.moods[0]];
+  const g = (state.genres.find(function(x){return m.genres.indexOf(x)>-1;})) || m.genres[0];
+  const fits = m.who.indexOf(state.who) > -1;
+  const parts = [];
+  const adj = LANG[m.lang].adj;
+  parts.push(["A ", el("strong",{text:moodPart}), " " + (adj ? adj + " " : "") + GENRE_WORD[g]]);
+  parts.push(fits ? " that suits " + WHO_WORD[state.who] : "");
+  const svcHit = state.svcs.filter(function(x){return m.svc.indexOf(x)>-1;});
+  parts.push(svcHit.length ? ", and it's a " + SVC_NAME[svcHit[0]] + " title" : "");
+  parts.push(".");
+  const p = el("p",{class:"why"});
+  parts.forEach(function(x){ (Array.isArray(x)? x : [x]).forEach(function(y){ p.append(y && y.nodeType ? y : document.createTextNode(y)); }); });
+  return p;
+}
+
+/* ---------- OMDb ---------- */
+async function omdb(m){
+  const k = mkey(m);
+  if(omdbCache[k]) return omdbCache[k];
+  if(!state.key) return null;
+  try{
+    let url = "https://www.omdbapi.com/?apikey=" + enc(state.key) + "&type=movie&t=" + enc(m.title) + "&y=" + m.year;
+    let r = await fetch(url); let j = await r.json();
+    if(j.Response !== "True"){
+      if(/invalid api key/i.test(j.Error||"")) return {error:"key"};
+      if(/limit/i.test(j.Error||"")) return {error:"limit"};
+      r = await fetch("https://www.omdbapi.com/?apikey=" + enc(state.key) + "&type=movie&t=" + enc(m.title));
+      j = await r.json();
+      if(j.Response !== "True") return null;
+    }
+    const keep = {
+      poster: j.Poster && j.Poster !== "N/A" ? j.Poster : "",
+      imdb: j.imdbRating && j.imdbRating !== "N/A" ? j.imdbRating : "",
+      votes: j.imdbVotes && j.imdbVotes !== "N/A" ? j.imdbVotes : "",
+      rt: ((j.Ratings||[]).find(function(x){return x.Source==="Rotten Tomatoes";})||{}).Value || "",
+      meta: j.Metascore && j.Metascore !== "N/A" ? j.Metascore : "",
+      rated: j.Rated && j.Rated !== "N/A" ? j.Rated : "",
+      runtime: parseInt(j.Runtime,10) || 0,
+      plot: j.Plot && j.Plot !== "N/A" ? j.Plot : "",
+      director: j.Director && j.Director !== "N/A" ? j.Director : "",
+      actors: j.Actors && j.Actors !== "N/A" ? j.Actors : "",
+      genre: j.Genre || "",
+      imdbID: j.imdbID || ""
+    };
+    omdbCache[k] = keep;
+    save("omdb", omdbCache);
+    return keep;
+  }catch(e){ return {error:"network"}; }
+}
+
+/* ---------- Rendering ---------- */
+function posterBox(m, info){
+  const box = el("div",{class:"poster"});
+  const faux = el("div",{class:"fauxposter",style:"--h:"+hue(m.title)},[el("b",{text:m.title}),el("span",{text:String(m.year)})]);
+  box.append(faux);
+  if(info && info.poster){
+    const img = el("img",{src:info.poster,alt:"Poster for "+m.title,loading:"lazy",referrerpolicy:"no-referrer"});
+    img.addEventListener("error",function(){ img.remove(); });
+    box.append(img);
+  }
+  return box;
+}
+function links(m, info, small){
+  const q = m.title + " " + m.year;
+  const wrap = el("div",{class:"actions"});
+  wrap.append(el("a",{class:"btn"+(small?"":" primary"),href:"https://www.youtube.com/results?search_query="+enc(q+" official trailer"),target:"_blank",rel:"noopener"},["▶ Trailer"]));
+  wrap.append(el("a",{class:"btn",href:"https://www.justwatch.com/in/search?q="+enc(m.title),target:"_blank",rel:"noopener"},["Where to stream"]));
+  if(!small && info && info.imdbID){
+    wrap.append(el("a",{class:"btn",href:"https://www.imdb.com/title/"+info.imdbID+"/",target:"_blank",rel:"noopener"},["IMDb"]));
+  }
+  const seenOn = state.seen.indexOf(mkey(m)) > -1;
+  wrap.append(el("button",{type:"button",class:"btn seen","aria-pressed":String(seenOn),onclick:function(ev){
+    toggleSeen(m); ev.currentTarget.setAttribute("aria-pressed", String(state.seen.indexOf(mkey(m))>-1));
+    ev.currentTarget.textContent = state.seen.indexOf(mkey(m))>-1 ? "✓ Seen — won't suggest again" : "Seen it";
+  }},[seenOn ? "✓ Seen — won't suggest again" : "Seen it"]));
+  return wrap;
+}
+function scores(info){
+  const s = el("div",{class:"scores"});
+  if(info && info.imdb) s.append(el("span",{class:"score"},[el("small",{text:"IMDb"}),el("b",{text:info.imdb}),"/10"]));
+  if(info && info.rt) s.append(el("span",{class:"score"},[el("small",{text:"Rotten Tomatoes"}),el("b",{text:info.rt})]));
+  if(info && info.meta) s.append(el("span",{class:"score"},[el("small",{text:"Metacritic"}),el("b",{text:info.meta})]));
+  return s.childNodes.length ? s : null;
+}
+function metaLine(m, info){
+  const mins = (info && info.runtime) || m.mins;
+  const bits = [String(m.year), fmtMins(mins), LANG[m.lang].label];
+  if(info && info.rated) bits.push(info.rated);
+  bits.push((info && info.genre) ? info.genre : m.genres.map(function(g){return GENRE_WORD[g];}).join(", "));
+  const d = el("div",{class:"meta"});
+  bits.forEach(function(b){ d.append(el("span",{text:b})); });
+  return d;
+}
+function svcBadges(m){
+  if(!m.svc.length) return null;
+  const d = el("div",{class:"actions"});
+  m.svc.forEach(function(s){ d.append(el("span",{class:"svc",text:SVC_NAME[s]+" original or studio title"})); });
+  return d;
+}
+
+function featureTicket(m, info){
+  const mins = (info && info.runtime) || m.mins;
+  const infoBox = el("div",{class:"info"},[
+    el("h2",{class:"title",text:m.title}),
+    metaLine(m, info),
+    scores(info),
+    whyText(m),
+    info && info.plot ? el("p",{class:"plot",text:info.plot}) : null,
+    info && (info.director || info.actors) ? el("div",{class:"credits"},[
+      info.director ? el("span",null,["Directed by ",el("b",{text:info.director})]) : null,
+      info.director && info.actors ? " · " : null,
+      info.actors ? el("span",null,["Starring ",el("b",{text:info.actors})]) : null
+    ]) : null,
+    svcBadges(m),
+    links(m, info, false),
+    el("div",{class:"showtime"},["ADMIT ONE · " + state.name.toUpperCase() + " · Start now and you're done by ",el("b",{text:endsAt(mins)})])
+  ]);
+  return el("article",{class:"ticket fade-in"},[posterBox(m, info), infoBox]);
+}
+function stub(m, info){
+  return el("article",{class:"stub fade-in"},[
+    posterBox(m, info),
+    el("div",{class:"info"},[
+      el("h3",{text:m.title}),
+      metaLine(m, info),
+      scores(info),
+      whyText(m),
+      links(m, info, true)
+    ])
+  ]);
+}
+
+let lastPick = null;
+async function run(){
+  const status = document.getElementById("status");
+  const res = document.getElementById("result");
+  const r = pick();
+  lastPick = r;
+  res.textContent = "";
+  if(!r.list.length){
+    res.append(el("div",{class:"empty"},[
+      el("b",{text:"No match for that combination."}),
+      " " + state.name + ", try dropping a genre, picking a different mood, or clearing your seen list."
+    ]));
+    status.textContent = "";
+    return;
+  }
+  status.textContent = r.poolSize + " movies fit, " + state.name + ". " + (r.recycled ? "You've seen every match, so the reel starts over." : "Not feeling it? Pick again for 3 new ones.");
+  document.getElementById("roll").textContent = "Pick again";
+
+  const infos = await Promise.all(r.list.map(omdb));
+  if(lastPick !== r) return;
+  const errs = infos.filter(function(x){return x && x.error;});
+  if(errs.length){
+    const e = errs[0].error;
+    status.textContent = e === "key" ? "OMDb says your key isn't valid. Check it under OMDb key." :
+                         e === "limit" ? "OMDb's daily limit is reached, so details are hidden until tomorrow." :
+                         "Couldn't reach OMDb right now, so posters and ratings are hidden.";
+  }
+  const clean = infos.map(function(x){ return x && !x.error ? x : null; });
+
+  res.append(el("div",{class:"eyebrow",text:"Tonight's feature for " + state.name}));
+  res.append(featureTicket(r.list[0], clean[0]));
+  if(r.list.length > 1){
+    res.append(el("div",{class:"backups-head"},[el("div",{class:"eyebrow",text:"Or, if that's not it"})]));
+    const b = el("div",{class:"backups"});
+    r.list.slice(1).forEach(function(m,i){ b.append(stub(m, clean[i+1])); });
+    res.append(b);
+  }
+}
+
+/* ---------- Seen list ---------- */
+function toggleSeen(m){
+  const k = mkey(m), i = state.seen.indexOf(k);
+  if(i > -1) state.seen.splice(i,1); else state.seen.push(k);
+  saveP("seen", state.seen); renderSeen();
+}
+function renderSeen(){
+  document.getElementById("seenBtn").textContent = "Seen list (" + state.seen.length + ")";
+  const list = document.getElementById("seenList");
+  list.textContent = state.seen.length
+    ? state.seen.map(function(k){ const p = k.split("|"); return p[0] + " (" + p[1] + ")"; }).join(" · ")
+    : "Nothing yet. Tap \"Seen it\" on any pick and Fliq won't suggest it again.";
+}
+
+/* ---------- Key panel ---------- */
+async function testKey(k){
+  try{
+    const r = await fetch("https://www.omdbapi.com/?apikey=" + enc(k) + "&i=tt3896198");
+    const j = await r.json();
+    return j.Response === "True" ? "ok" : (/invalid/i.test(j.Error||"") ? "bad" : "other");
+  }catch(e){ return "net"; }
+}
+function wireKey(){
+  const box = document.getElementById("keybox"), input = document.getElementById("keyInput"), msg = document.getElementById("keyMsg");
+  input.value = state.key;
+  if(!state.key) box.hidden = false;
+  document.getElementById("keyToggle").addEventListener("click",function(){ box.hidden = !box.hidden; if(!box.hidden) input.focus(); });
+  async function saveKey(){
+    const k = input.value.trim();
+    if(!k){ msg.className = "keymsg err"; msg.textContent = "Paste your key first."; return; }
+    msg.className = "keymsg"; msg.textContent = "Checking with OMDb…";
+    const t = await testKey(k);
+    if(t === "bad"){ msg.className = "keymsg err"; msg.textContent = "OMDb didn't accept that key. Make sure you clicked the activation link in your email."; return; }
+    if(t === "net"){ msg.className = "keymsg err"; msg.textContent = "Couldn't reach OMDb. Check your connection and try again."; return; }
+    state.key = k; save("key", k);
+    msg.className = "keymsg ok"; msg.textContent = "Key saved. Posters and ratings are on.";
+    setTimeout(function(){ box.hidden = true; msg.textContent = ""; }, 1400);
+    if(lastPick){ state.shown = state.shown.filter(function(id){ return lastPick.list.every(function(m){return m.id!==id;}); }); }
+    run();
+  }
+  document.getElementById("keySave").addEventListener("click", saveKey);
+  input.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); saveKey(); } });
+  document.getElementById("keyForm").addEventListener("submit", function(e){ e.preventDefault(); saveKey(); });
+  document.getElementById("keyClear").addEventListener("click",function(){
+    state.key = ""; save("key",""); input.value = ""; msg.className = "keymsg"; msg.textContent = "Key removed.";
+  });
+}
+
+/* ---------- Boot ---------- */
+wireKey();
+document.getElementById("roll").addEventListener("click", run);
+document.getElementById("seenBtn").addEventListener("click",function(){ const b = document.getElementById("seenbox"); b.hidden = !b.hidden; });
+document.getElementById("seenClear").addEventListener("click",function(){ state.seen = []; saveP("seen",[]); renderSeen(); });
+
+/* ---------- Who's watching gate ---------- */
+let people = load("people", []);
+let managing = false;
+function greeting(){
+  const h = new Date().getHours();
+  return h < 5 ? "Late night" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+function initial(n){ return (n.trim()[0] || "?").toUpperCase(); }
+function renderGate(adding){
+  const wrap = document.getElementById("people"), form = document.getElementById("nameForm");
+  const manage = document.getElementById("manageBtn"), cancel = document.getElementById("cancelAdd");
+  const sub = document.getElementById("gateSub");
+  wrap.textContent = "";
+  const showForm = adding || !people.length;
+  form.hidden = !showForm;
+  wrap.hidden = showForm;
+  manage.hidden = showForm || !people.length;
+  manage.textContent = managing ? "Done" : "Manage people";
+  cancel.hidden = !(adding && people.length);
+  sub.textContent = showForm
+    ? (people.length ? "Add someone new. Fliq keeps their picks and seen list separate." : "Tell Fliq your name and it'll pick tonight's movie for you.")
+    : (managing ? "Tap × to remove someone and their seen list." : "Pick your name to continue.");
+  if(showForm){ const i = document.getElementById("nameInput"); i.value = ""; setTimeout(function(){ i.focus(); }, 30); return; }
+  people.forEach(function(n){
+    const b = el("button",{type:"button",class:"person","aria-label": managing ? "Remove " + n : "Continue as " + n, onclick:function(){
+      if(managing){
+        people = people.filter(function(x){ return x !== n; }); save("people", people);
+        ["who","moods","genres","svcs","langs","seen"].forEach(function(k){ try{ localStorage.removeItem("fliq.p." + n.toLowerCase() + "." + k); }catch(e){} });
+        if(!people.length) managing = false;
+        renderGate(false); return;
+      }
+      enter(n);
+    }},[
+      el("span",{class:"face",style:"--h:" + hue(n.toLowerCase()),text:initial(n)}),
+      el("span",{class:"nm",text:n}),
+      managing ? el("span",{class:"x","aria-hidden":"true",text:"×"}) : null
+    ]);
+    wrap.append(b);
+  });
+  if(!managing && people.length < 8){
+    wrap.append(el("button",{type:"button",class:"person add","aria-label":"Add a person",onclick:function(){ renderGate(true); }},[
+      el("span",{class:"face",text:"+"}), el("span",{class:"nm",text:"Add person"})
+    ]));
+  }
+}
+function enter(n){
+  state.name = n;
+  save("last", n);
+  loadProfile();
+  document.getElementById("greet").firstChild.textContent = greeting() + ", " + n;
+  document.getElementById("whoTitle").textContent = "Who's watching with you, " + n + "?";
+  document.getElementById("result").textContent = "";
+  document.getElementById("status").textContent = "";
+  document.getElementById("roll").textContent = "Pick my movie";
+  document.getElementById("gate").hidden = true;
+  document.getElementById("app").hidden = false;
+  window.scrollTo(0,0);
+  renderChips(); renderSeen(); run();
+}
+function submitName(){
+  const n = document.getElementById("nameInput").value.trim().replace(/\s+/g," ");
+  if(!n){ document.getElementById("gateSub").textContent = "Type your name to continue."; return; }
+  const existing = people.find(function(x){ return x.toLowerCase() === n.toLowerCase(); });
+  if(!existing){ people.push(n); save("people", people); }
+  enter(existing || n);
+}
+document.getElementById("goBtn").addEventListener("click", submitName);
+document.getElementById("nameInput").addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); submitName(); } });
+document.getElementById("nameForm").addEventListener("submit", function(e){ e.preventDefault(); submitName(); });
+document.getElementById("cancelAdd").addEventListener("click", function(){ renderGate(false); });
+document.getElementById("manageBtn").addEventListener("click", function(){ managing = !managing; renderGate(false); });
+document.getElementById("switchBtn").addEventListener("click", function(){
+  managing = false;
+  document.getElementById("app").hidden = true;
+  document.getElementById("gate").hidden = false;
+  document.getElementById("keybox").hidden = true;
+  document.getElementById("seenbox").hidden = true;
+  renderGate(false);
+  window.scrollTo(0,0);
+});
+renderGate(false);
+})();
+</script>
+</body>
+</html>
